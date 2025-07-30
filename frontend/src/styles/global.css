@@ -1,0 +1,117 @@
+/* Warna dasar dan font */
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #F6EDE4; /* Beige Muda */
+  color: #5F4B41; /* Cokelat Abu */
+}
+
+/* Layout utama */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  background-color: #D8BFAA; /* Beige Tua / Taupe */
+  padding: 2rem 1rem;
+  min-width: 200px;
+}
+
+.sidebar h2 {
+  color: #5F4B41;
+  margin-bottom: 1.5rem;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar li {
+  margin-bottom: 1rem;
+}
+
+.sidebar a {
+  color: #5F4B41;
+  text-decoration: none;
+  font-weight: 500;
+  display: block;
+}
+
+.sidebar a.active {
+  color: #C6A78F; /* Highlight Aktif */
+  font-weight: bold;
+}
+
+/* Konten utama */
+.content {
+  flex-grow: 1;
+  padding: 2rem;
+}
+
+/* Section layout */
+.section {
+  margin-bottom: 3rem;
+}
+
+.section h3 {
+  font-size: 1.4rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #F2DAC4; /* Peach Soft */
+  padding-bottom: 0.5rem;
+  color: #5F4B41;
+}
+
+/* Kartu berita */
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.card {
+  background-color: #F3E2CF; /* Cream */
+  border-radius: 10px;
+  height: 140px;
+  flex: 1 1 200px;
+}
+
+/* Responsive: untuk layar kecil (hp) */
+@media screen and (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 1rem;
+  }
+
+  .sidebar ul {
+    display: flex;
+    gap: 1.5rem;
+  }
+
+  .sidebar li {
+    margin: 0;
+  }
+
+  .content {
+    padding: 1rem;
+  }
+
+  .cards {
+    flex-direction: column;
+  }
+
+  .card {
+    width: 100%;
+    height: 100px;
+  }
+}
