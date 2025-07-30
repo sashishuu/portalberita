@@ -21,10 +21,10 @@ import {
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
-import { createArticle } from '../store/slices/articleSlice';
-import { fetchCategories } from '../store/slices/categorySlice';
-import LoadingSpinner from '../components/common/LoadingSpinner';
-import ImageUpload from '../components/common/ImageUpload';
+import { createArticle } from '../../store/slices/articleSlice';
+import { fetchCategories } from '../../store/slices/categorySlice';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
+import ImageUpload from '../../components/common/ImageUpload';
 
 // Validation schema
 const articleSchema = yup.object({
@@ -626,5 +626,10 @@ const CreateArticlePage = () => {
    </>
  );
 };
+
+
+
+
+
 
 export default CreateArticlePage;

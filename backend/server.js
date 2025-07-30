@@ -8,7 +8,7 @@ const morgan = require('morgan');
 require('dotenv').config();
 
 // Import database connection
-const connectDatabase = require('./config/database');
+const connectDatabase = require('./config/db');
 
 // Import routes
 const userRoutes = require('./routes/userRoutes');
