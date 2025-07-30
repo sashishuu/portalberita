@@ -1,23 +1,49 @@
 const express = require('express');
-const router = express.Router();
-const userController = require('../controllers/userController');
+const { body } = require('express-validator');
+const {
+  registerUser,
+  verifyEmail,
+  loginUser,
+  getUserProfile,
+  updateUserProfile,
+  refreshToken
+} = require('../controllers/userController');
 const { authMiddleware } = require('../middleware/authMiddleware');
-const { loginLimiter } = require('../middleware/rateLimiter');
-const { handleUpload } = require('../middleware/uploadMiddleware');
+const { validateRequest } = require('../middleware/validateRequest');
 
-// Public routes
-router.post('/register', userController.register);
-router.post('/login', loginLimiter, userController.login);
-router.post('/refresh-token', userController.refreshToken);
-router.post('/upload-avatar', authMiddleware, handleUpload('profile'), userController.uploadProfilePicture);
-// Protected routes
-router.get('/me', authMiddleware, userController.getProfile);
-router.put('/me', authMiddleware, userController.updateProfile);
-router.delete('/:id', authMiddleware, userController.deleteAccount);
-router.get('/verify/:token', userController.verifyEmail);
+const router = express.Router();
 
+// Validation rules
+const registerValidation = [
+  body('name')
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Name must be between 2 and 50 characters'),
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please enter a valid email'),
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters long')
+];
 
+const loginValidation = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please enter a valid email'),
+  body('password')
+    .exists()
+    .withMessage('Password is required')
+];
 
-
+// Routes
+router.post('/register', registerValidation, validateRequest, registerUser);
+router.get('/verify/:token', verifyEmail);
+router.post('/login', loginValidation, validateRequest, loginUser);
+router.get('/me', authMiddleware, getUserProfile);
+router.put('/me', authMiddleware, updateUserProfile);
+router.post('/refresh-token', refreshToken);
 
 module.exports = router;

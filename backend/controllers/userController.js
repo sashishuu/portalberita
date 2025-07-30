@@ -1,162 +1,193 @@
-const path = require('path');
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { sendVerificationEmail } = require('../utils/email');
-const { generateAccessToken, generateRefreshToken } = require('../utils/jwt');
-const { handleUpload } = require('../middleware/uploadMiddleware');
 
-// 🛡 Generate access token
-const generateToken = (user) => {
-  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
+// Generate JWT
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '24h' });
 };
 
-// 📌 Register
-const register = async (req, res) => {
+const generateRefreshToken = (id) => {
+  return jwt.sign({ id }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '7d' });
+};
+
+// Register user
+const registerUser = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
-    if (!username || !email || !password) return res.status(400).json({ message: 'All fields required' });
-    if (password.length < 6) return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    const { name, email, password } = req.body;
 
-    const existing = await User.findOne({ email });
-    if (existing) return res.status(400).json({ message: 'Email already exists' });
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ username, email, password: hashedPassword, role: 'user', isVerified: false });
-
-    const verificationToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    await sendVerificationEmail(user.email, verificationToken);
-
-    res.status(201).json({ message: 'Verification email sent', user: { _id: user._id, email } });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// ✅ Verify email
-const verifyEmail = async (req, res) => {
-  try {
-    const decoded = jwt.verify(req.params.token, process.env.JWT_SECRET);
-    await User.findByIdAndUpdate(decoded.id, { isVerified: true });
-    res.json({ message: 'Email verified successfully' });
-  } catch (err) {
-    res.status(400).json({ message: 'Invalid or expired token' });
-  }
-};
-
-// ✅ Login
-const login = async (req, res) => {
-  const { email, password } = req.body;
-  const user = await User.findOne({ email });
-  if (!user || !(await bcrypt.compare(password, user.password))) {
-    return res.status(400).json({ message: 'Invalid credentials' });
-  }
-
-  const accessToken = generateAccessToken(user);
-  const refreshToken = generateRefreshToken(user);
-
-  res.cookie('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'Strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000
-  });
-
-  res.json({
-    message: 'Login successful',
-    token: accessToken,
-    user: {
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.role
+    // Check if user exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists' });
     }
-  });
-};
 
-// ✅ Refresh Token
-const refreshToken = async (req, res) => {
-  const refreshToken = req.body.refreshToken;
-  if (!refreshToken) return res.status(401).json({ message: 'No refresh token provided' });
+    // Generate verification token
+    const verificationToken = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-  try {
-    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-    const accessToken = jwt.sign({ id: decoded.id, role: decoded.role }, process.env.JWT_SECRET, {
-      expiresIn: '1d',
+    // Create user
+    const user = new User({
+      name,
+      email,
+      password,
+      verificationToken
     });
 
-    res.json({ accessToken });
-  } catch (err) {
-    res.status(403).json({ message: 'Invalid refresh token' });
+    await user.save();
+
+    // Send verification email
+    await sendVerificationEmail(email, verificationToken);
+
+    res.status(201).json({
+      message: 'User registered successfully. Please check your email for verification.',
+      userId: user._id
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Server error during registration' });
   }
 };
 
-// ✅ Get Profile
-const getProfile = async (req, res) => {
+// Verify email
+const verifyEmail = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    res.status(200).json(user);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+    const { token } = req.params;
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findOne({ 
+      email: decoded.email, 
+      verificationToken: token 
+    });
 
-// ✅ Update Profile
-const updateProfile = async (req, res) => {
-  try {
-    const updates = { ...req.body };
-    if (updates.password && updates.password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid verification token' });
     }
 
-    if (updates.password) {
-      updates.password = await bcrypt.hash(updates.password, 10);
-    }
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    await user.save();
 
-    const updated = await User.findByIdAndUpdate(req.user.id, updates, { new: true }).select('-password');
-    if (!updated) return res.status(404).json({ message: 'User not found' });
-
-    res.status(200).json({ message: 'Profile updated', user: updated });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.json({ message: 'Email verified successfully' });
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid or expired verification token' });
   }
 };
 
-// ✅ Delete account
-const deleteAccount = async (req, res) => {
+// Login user
+const loginUser = async (req, res) => {
   try {
-    const { id } = req.params;
-    if (req.user.role !== 'admin' && req.user.id !== id) {
-      return res.status(403).json({ message: 'Unauthorized' });
+    const { email, password } = req.body;
+
+    // Find user
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    const deleted = await User.findByIdAndDelete(id);
-    if (!deleted) return res.status(404).json({ message: 'User not found' });
+    // Check if email is verified
+    if (!user.isVerified) {
+      return res.status(400).json({ message: 'Email not verified' });
+    }
 
-    res.status(200).json({ message: 'User deleted successfully' });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    // Check password
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    // Generate tokens
+    const token = generateToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    // Save refresh token
+    user.refreshToken = refreshToken;
+    await user.save();
+
+    // Set refresh token as HTTP-only cookie
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    res.json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error during login' });
   }
 };
 
-// ✅ Upload avatar
-const uploadProfilePicture = async (req, res) => {
-  if (!req.file) return res.status(400).json({ message: 'No image uploaded' });
-
-  const filePath = '/uploads/profile/' + path.basename(req.file.filepath);
-  const user = await User.findByIdAndUpdate(req.user.id, { avatar: filePath }, { new: true });
-  res.json({ message: 'Avatar uploaded', user });
+// Get user profile
+const getUserProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
 };
 
-// ✅ Export semua
+// Update user profile
+const updateUserProfile = async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    const user = await User.findById(req.user.id);
+
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (password) {
+      if (password.length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+      }
+      user.password = password;
+    }
+
+    await user.save();
+    res.json({ message: 'Profile updated successfully', user });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Refresh token
+const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.cookies;
+    
+    if (!refreshToken) {
+      return res.status(401).json({ message: 'Refresh token not provided' });
+    }
+
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+    const user = await User.findOne({ _id: decoded.id, refreshToken });
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid refresh token' });
+    }
+
+    const newToken = generateToken(user._id);
+    res.json({ token: newToken });
+  } catch (error) {
+    res.status(401).json({ message: 'Invalid refresh token' });
+  }
+};
+
 module.exports = {
-  register,
+  registerUser,
   verifyEmail,
-  login,
-  refreshToken,
-  getProfile,
-  updateProfile,
-  deleteAccount,
-  uploadProfilePicture
+  loginUser,
+  getUserProfile,
+  updateUserProfile,
+  refreshToken
 };

@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: .
+    ports:
+      - "3000:80"
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000/api
+      - REACT_APP_SOCKET_URL=http://localhost:5000
+    depends_on:
+      - backend
+    networks:
+      - portal-berita-network
+
+  backend:
+    build: ../backend
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongo:27017/portal-berita
+      - JWT_SECRET=your-super-secret-jwt-key
+      - JWT_REFRESH_SECRET=your-super-secret-refresh-key
+    depends_on:
+      - mongo
+    networks:
+      - portal-berita-network
+
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - portal-berita-network
+
+volumes:
+  mongo-data:
+
+networks:
+  portal-berita-network:
+    driver: bridge

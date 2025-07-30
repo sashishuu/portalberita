@@ -1,26 +1,57 @@
 const express = require('express');
+const {
+  getCommentsByArticle,
+  createComment,
+  updateComment,
+  deleteComment,
+  getUserComments
+} = require('../controllers/commentController');
 const { authMiddleware } = require('../middleware/authMiddleware');
+const { sanitizeInput } = require('../middleware/sanitizeMiddleware');
+const { 
+  validateCommentCreation, 
+  validateCommentUpdate, 
+  checkValidationResult,
+  detectSpam 
+} = require('../middleware/validateComment');
+const { validateObjectId, validatePagination } = require('../middleware/validateRequest');
 const { commentLimiter } = require('../middleware/rateLimiter');
-const { validateCommentInput } = require('../middleware/validateComment');
 
-module.exports = (io) => {
-  const router = express.Router();
-  const commentController = require('../controllers/commentController'); // inject io ke controller
+const router = express.Router();
 
-  // Public: mendapatkan komentar (bisa pakai query ?articleId=...)
-  router.get('/', commentController.getAllComments);
+// Public routes
+router.get('/article/:articleId', 
+  validateObjectId('articleId'),
+  validatePagination,
+  getCommentsByArticle
+);
 
-  // Protected: membuat komentar
-  router.post(
-    '/',
-    authMiddleware,
-    commentLimiter,
-    validateCommentInput,
-    commentController.createComment
-  );
+// Protected routes
+router.use(authMiddleware); // All routes below require authentication
 
-  // Protected: menghapus komentar
-  router.delete('/:id', authMiddleware, commentController.deleteComment);
+router.get('/user/my-comments', validatePagination, getUserComments);
 
-  return router;
-};
+router.post('/',
+  commentLimiter,
+  sanitizeInput,
+  detectSpam,
+  validateCommentCreation,
+  checkValidationResult,
+  createComment
+);
+
+router.put('/:id',
+  validateObjectId('id'),
+  sanitizeInput,
+  detectSpam,
+  validateCommentUpdate,
+  checkValidationResult,
+  updateComment
+);
+
+router.delete('/:id',
+  validateObjectId('id'),
+  deleteComment
+);
+
+module.exports = router;
