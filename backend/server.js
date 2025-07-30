@@ -23,7 +23,7 @@ const { sanitizeInput } = require('./middleware/sanitizeMiddleware');
 const { handleUploadError } = require('./middleware/uploadMiddleware');
 
 // Import socket configuration
-const { initializeSocket } = require('./config/socket');
+const { initSocket } = require('./config/socket');
 
 // Import utils
 const { ensureUploadDirectories } = require('./utils/uploadHandler');
@@ -41,7 +41,7 @@ const io = socketIo(server, {
 });
 
 // Initialize socket handlers
-initializeSocket(io);
+initSocket(io);
 
 // Security middleware
 app.use(helmet({

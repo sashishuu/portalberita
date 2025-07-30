@@ -144,6 +144,27 @@ export const searchArticles = createAsyncThunk(
   }
 );
 
+
+
+export const changePassword = createAsyncThunk(
+  'auth/changePassword',
+  async (passwordData, { getState, rejectWithValue }) => {
+    try {
+      const { auth: { user } } = getState();
+      const config = {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.token}`,
+        },
+      };
+      const response = await axios.put('/api/users/change-password', passwordData, config);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
 export const toggleBookmark = createAsyncThunk(
   'article/toggleBookmark',
   async (articleId, { rejectWithValue }) => {

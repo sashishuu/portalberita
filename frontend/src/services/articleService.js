@@ -10,6 +10,11 @@ const api = axios.create({
   },
 });
 
+// Add this inside the articleService object
+const getArticlesByCategory = (categorySlug) => {
+  return axios.get(`/api/articles/category/${categorySlug}`);
+};
+
 // Add token to requests
 api.interceptors.request.use(
   (config) => {
